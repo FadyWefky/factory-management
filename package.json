@@ -1,0 +1,19 @@
+{
+  "name": "factory-management",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "electron ."
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "electron": "^22.0.0",
+    "pg": "^8.7.3",
+    "exceljs": "^4.3.0"
+  }
+}

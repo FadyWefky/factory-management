@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>نظام إدارة المصنع</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: 'Cairo', sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-gray-100">
+  <div id="app" class="container mx-auto p-6">
+    <!-- Navigation -->
+    <nav class="bg-blue-600 text-white p-4 rounded-lg shadow mb-6">
+      <ul class="flex space-x-4 justify-center">
+        <li><button onclick="showTab('clients')" class="hover:bg-blue-700 px-4 py-2 rounded">العملاء</button></li>
+        <li><button onclick="showTab('capital')" class="hover:bg-blue-700 px-4 py-2 rounded">رأس المال</button></li>
+        <li><button onclick="showTab('expenses')" class="hover:bg-blue-700 px-4 py-2 rounded">المصاريف اليومية</button></li>
+        <li><button onclick="showTab('purchases')" class="hover:bg-blue-700 px-4 py-2 rounded">المشتريات</button></li>
+        <li><button onclick="showTab('manufacturing')" class="hover:bg-blue-700 px-4 py-2 rounded">التصنيع</button></li>
+        <li><button onclick="showTab('sales')" class="hover:bg-blue-700 px-4 py-2 rounded">المبيعات</button></li>
+        <li><button onclick="showTab('credit')" class="hover:bg-blue-700 px-4 py-2 rounded">البيع بالأجل</button></li>
+      </ul>
+    </nav>
+
+    <!-- Tabs -->
+    <div id="clients" class="tab hidden">
+      <h2 class="text-2xl font-bold mb-4">إدارة العملاء</h2>
+      <button onclick="openAddClientModal()" class="bg-green-500 text-white px-4 py-2 rounded mb-4">إضافة عميل</button>
+      <div id="clientList" class="grid grid-cols-1 gap-4"></div>
+    </div>
+
+    <div id="capital" class="tab hidden">
+      <h2 class="text-2xl font-bold mb-4">رأس المال</h2>
+      <p id="capitalAmount" class="text-xl mb-4">المبلغ الحالي: 0</p>
+      <button onclick="openCapitalModal()" class="bg-blue-500 text-white px-4 py-2 rounded mb-4">تعديل رأس المال</button>
+      <div id="capitalHistory" class="grid grid-cols-1 gap-4"></div>
+    </div>
+
+    <div id="expenses" class="tab hidden">
+      <h2 class="text-2xl font-bold mb-4">المصاريف اليومية</h2>
+      <div class="flex space-x-4 mb-4">
+        <select id="expenseType" class="p-2 border rounded">
+          <option value="كهرباء">كهرباء</option>
+          <option value="ماء">ماء</option>
+          <option value="إيجار">إيجار</option>
+          <option value="رواتب">رواتب</option>
+          <option value="أخرى">أخرى</option>
+        </select>
+        <input id="expenseAmount" type="number" placeholder="المبلغ" class="p-2 border rounded">
+        <input id="expenseDetails" type="text" placeholder="التفاصيل" class="p-2 border rounded">
+        <button onclick="addExpense()" class="bg-red-500 text-white px-4 py-2 rounded">تأكيد</button>
+      </div>
+      <div id="expenseList" class="grid grid-cols-1 gap-4"></div>
+    </div>
+
+    <div id="purchases" class="tab hidden">
+      <h2 class="text-2xl font-bold mb-4">المشتريات</h2>
+      <div class="flex space-x-4 mb-4">
+        <select id="purchaseType" class="p-2 border rounded">
+          <option value="مواد خام">مواد خام</option>
+          <option value="معدات">معدات</option>
+          <option value="أدوات">أدوات</option>
+          <option value="قطع غيار">قطع غيار</option>
+          <option value="أخرى">أخرى</option>
+        </select>
+        <input id="purchaseAmount" type="number" placeholder="المبلغ" class="p-2 border rounded">
+        <input id="purchaseDetails" type="text" placeholder="التفاصيل" class="p-2 border rounded">
+        <button onclick="addPurchase()" class="bg-red-500 text-white px-4 py-2 rounded">تأكيد</button>
+      </div>
+      <div id="purchaseList" class="grid grid-cols-1 gap-4"></div>
+    </div>
+
+    <div id="manufacturing" class="tab hidden">
+      <h2 class="text-2xl font-bold mb-4">التصنيع</h2>
+      <button onclick="openAddProductModal()" class="bg-green-500 text-white px-4 py-2 rounded mb-4">إضافة منتج</button>
+      <div id="productList" class="grid grid-cols-1 gap-4"></div>
+    </div>
+
+    <div id="sales" class="tab hidden">
+      <h2 class="text-2xl font-bold mb-4">المبيعات</h2>
+      <div id="salesList" class="grid grid-cols-1 gap-4"></div>
+    </div>
+
+    <div id="credit" class="tab hidden">
+      <h2 class="text-2xl font-bold mb-4">البيع بالأجل</h2>
+      <div id="creditList" class="grid grid-cols-1 gap-4"></div>
+    </div>
+
+    <!-- Modals -->
+    <div id="addClientModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center">
+      <div class="bg-white p-6 rounded-lg shadow-lg">
+        <h3 class="text-xl font-bold mb-4">إضافة عميل</h3>
+        <input id="clientName" type="text" placeholder="اسم العميل" class="p-2 border rounded mb-4 w-full" required>
+        <button onclick="addClient()" class="bg-green-500 text-white px-4 py-2 rounded">إضافة</button>
+        <button onclick="closeModal('addClientModal')" class="bg-gray-500 text-white px-4 py-2 rounded">إغلاق</button>
+      </div>
+    </div>
+
+    <div id="capitalModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center">
+      <div class="bg-white p-6 rounded-lg shadow-lg">
+        <h3 class="text-xl font-bold mb-4">تعديل رأس المال</h3>
+        <input id="capitalChangeAmount" type="number" placeholder="المبلغ" class="p-2 border rounded mb-4 w-full">
+        <input id="capitalChangeReason" type="text" placeholder="السبب" class="p-2 border rounded mb-4 w-full">
+        <select id="capitalChangeType" class="p-2 border rounded mb-4 w-full">
+          <option value="add">إضافة</option>
+          <option value="withdraw">سحب</option>
+        </select>
+        <button onclick="updateCapital()" class="bg-blue-500 text-white px-4 py-2 rounded">تأكيد</button>
+        <button onclick="closeModal('capitalModal')" class="bg-gray-500 text-white px-4 py-2 rounded">إغلاق</button>
+      </div>
+    </div>
+
+    <div id="addProductModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center">
+      <div class="bg-white p-6 rounded-lg shadow-lg h-scroll">
+        <h3 class="text-xl font-bold mb-4">إضافة منتج</h3>
+        <input id="productName" type="text" placeholder="اسم المنتج" class="p-2 border rounded mb-4 w-full">
+        <div id="productSteps" class="mb-4"></div>
+        <button onclick="addProductStep()" class="bg-blue-500 text-white px-4 py-2 rounded mb-4">إضافة خطوة</button>
+        <button onclick="addProduct()" class="bg-green-500 text-white px-4 py-2 rounded">إضافة المنتج</button>
+        <button onclick="closeModal('addProductModal')" class="bg-gray-500 text-white px-4 py-2 rounded">إغلاق</button>
+      </div>
+    </div>
+
+    <div id="addOrderModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center">
+      <div class="bg-white p-6 rounded-lg shadow-lg">
+        <h3 class="text-xl font-bold mb-4" id="orderModalTitle">إضافة طلبية</h3>
+        <input id="orderQuantity" type="number" placeholder="الكمية" class="p-2 border rounded mb-4 w-full" min="1" required>
+        <input id="orderDetails" type="text" placeholder="التفاصيل" class="p-2 border rounded mb-4 w-full" required>
+        <input id="orderAmount" type="number" placeholder="المبلغ" class="p-2 border rounded mb-4 w-full" min="0" step="0.01" required>
+        <input id="orderPaid" type="number" placeholder="المدفوع" class="p-2 border rounded mb-4 w-full" min="0" step="0.01">
+        <button onclick="saveOrder()" class="bg-green-500 text-white px-4 py-2 rounded">حفظ</button>
+        <button onclick="closeModal('addOrderModal')" class="bg-gray-500 text-white px-4 py-2 rounded">إغلاق</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
