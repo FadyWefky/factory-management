@@ -12,8 +12,9 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "animate.css": "^4.1.1",
     "electron": "^22.0.0",
-    "pg": "^8.7.3",
-    "exceljs": "^4.3.0"
+    "exceljs": "^4.3.0",
+    "pg": "^8.7.3"
   }
 }
