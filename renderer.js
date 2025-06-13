@@ -13,6 +13,7 @@ const pool = new Pool({
 let currentClientId = null;
 let currentOrderId = null;
 
+
 async function initDatabase() {
   let attempts = 0;
   const maxAttempts = 3;
@@ -127,8 +128,8 @@ async function loadClients() {
         div.className = 'bg-white p-4 rounded shadow flex justify-between items-center';
         div.innerHTML = `
           <div>
-            <h3 class="text-lg font-bold">${client.name}</h3>
-            <button onclick="viewClient(${client.id})" class="bg-blue-500 text-white px-2 py-1 rounded">عرض التفاصيل</button>
+            <h3 class="text-lg font-bold text-teal-900">${client.name}</h3>
+            <button onclick="viewClient(${client.id})" class="bg-sky-900 text-white px-2 py-1 rounded">عرض التفاصيل</button>
           </div>
           <button onclick="deleteClient(${client.id})" class="bg-red-500 text-white px-2 py-1 rounded">مسح</button>
         `;
@@ -166,9 +167,9 @@ async function viewClient(clientId) {
     console.log('Orders data for client', clientId, ':', orders.rows);
     const clientList = document.getElementById('clientList');
     clientList.innerHTML = `
-      <h3 class="text-lg font-bold mb-4">${client.rows[0].name}</h3>
-      <button onclick="openAddOrderModal()" class="bg-green-500 text-white px-4 py-2 rounded mb-4">إضافة طلبية</button>
-      <button onclick="exportClientToExcel(${clientId})" class="bg-blue-500 text-white px-4 py-2 rounded mb-4">تصدير إلى Excel</button>
+      <h3 class="text-2xl font-bold mb-4 text-teal-900">${client.rows[0].name}</h3>
+      <button onclick="openAddOrderModal()" class="bg-green-700 text-white px-4 py-2 rounded mb-4 w-40">إضافة طلبية</button>
+      <button onclick="exportClientToExcel(${clientId})" class="bg-blue-900 text-white px-4 py-2 rounded mb-4 w-40">تصدير إلى Excel</button>
       <div id="orderList" class="grid grid-cols-1 gap-4"></div>
     `;
     if (orders.rows.length === 0) {
@@ -755,3 +756,6 @@ function closeModal(modalId) {
 
 initDatabase();
 showTab('clients');
+
+
+
