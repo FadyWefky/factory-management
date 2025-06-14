@@ -24,7 +24,7 @@ async function initDatabase() {
       console.log('Database connection successful at:', connTest.rows[0].now);
 
       // Check if tables exist, create only if they don't
-      const checkTable = await pool.query(`
+         const checkTable = await pool.query(`
         SELECT EXISTS (
           SELECT FROM pg_tables
           WHERE schemaname = 'public' AND tablename = 'clients'
@@ -84,10 +84,40 @@ async function initDatabase() {
             amount NUMERIC NOT NULL DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
           );
+          
+      CREATE TABLE IF NOT EXISTS product_sales (
+        id SERIAL PRIMARY KEY,
+        product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
+        quantity INTEGER NOT NULL DEFAULT 1,
+        sale_type TEXT NOT NULL CHECK (sale_type IN ('retail', 'wholesale')),
+        total_amount NUMERIC NOT NULL DEFAULT 0,
+        paid_amount NUMERIC NOT NULL DEFAULT 0,
+        remaining_amount NUMERIC NOT NULL DEFAULT 0,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
         `);
         console.log('Database schema created successfully');
       } else {
-        console.log('Database schema already exists, skipping creation');
+        try {
+          await pool.query('SELECT 1 FROM product_sales LIMIT 1');
+          console.log('product_sales table exists');
+        } catch (e) {
+          console.log('Creating product_sales table');
+          await pool.query(`
+            CREATE TABLE IF NOT EXISTS product_sales (
+              id SERIAL PRIMARY KEY,
+              product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
+              quantity INTEGER NOT NULL DEFAULT 1,
+              sale_type TEXT NOT NULL CHECK (sale_type IN ('retail', 'wholesale')),
+              total_amount NUMERIC NOT NULL DEFAULT 0,
+              paid_amount NUMERIC NOT NULL DEFAULT 0,
+              remaining_amount NUMERIC NOT NULL DEFAULT 0,
+              notes TEXT,
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+          `);
+        }
       }
       break;
     } catch (error) {
@@ -597,32 +627,379 @@ function addProductStep() {
 async function loadSales() {
   try {
     const result = await pool.query(`
-      SELECT s.*, c.name as client_name, p.name as product_name 
-      FROM sales s 
-      JOIN clients c ON s.client_id = c.id 
-      JOIN products p ON s.product_id = p.id
-      ORDER BY s.created_at DESC
+      SELECT ps.*, p.name as product_name 
+      FROM product_sales ps
+      LEFT JOIN products p ON ps.product_id = p.id
+      ORDER BY ps.created_at DESC
     `);
-    console.log('Sales data:', result.rows);
-    const salesList = document.getElementById('salesList');
-    salesList.innerHTML = '';
+    
+    const salesTableBody = document.getElementById('salesTableBody');
+    if (!salesTableBody) {
+      console.error('Sales table body element not found');
+      return;
+    }
+    
+    salesTableBody.innerHTML = '';
+    
     if (!result.rows || result.rows.length === 0) {
-      salesList.innerHTML = '<p class="text-gray-500">لا توجد مبيعات</p>';
+      salesTableBody.innerHTML = `
+        <tr>
+          <td colspan="9" class="p-4 text-center text-gray-500">لا توجد مبيعات مسجلة</td>
+        </tr>
+      `;
     } else {
       result.rows.forEach(sale => {
-        const amount = Number(sale.amount) || 0;
-        const div = document.createElement('div');
-        div.className = 'bg-white p-4 rounded shadow flex justify-between items-center';
-        div.innerHTML = `
-          <div>
-            <p>العميل: ${sale.client_name}</p>
-            <p>المنتج: ${sale.product_name}</p>
-            <p>المبلغ: ${amount.toFixed(2)}</p>
-            <p>التاريخ: ${new Date(sale.created_at).toLocaleString('ar-EG')}</p>
-          </div>
-          <button onclick="deleteSale(${sale.id})" class="bg-red-500 text-white px-2 py-1 rounded">مسح</button>
+        const totalAmount = Number(sale.total_amount) || 0;
+        const paidAmount = Number(sale.paid_amount) || 0;
+        const remainingAmount = Number(sale.remaining_amount) || 0;
+        const quantity = Number(sale.quantity) || 0;
+        
+        const row = document.createElement('tr');
+        row.className = 'border-b hover:bg-gray-50';
+        row.innerHTML = `
+          <td class="p-3">${sale.product_name || 'غير محدد'}</td>
+          <td class="p-3">${quantity}</td>
+          <td class="p-3">${sale.sale_type === 'retail' ? 'قطاعي' : 'جملة'}</td>
+          <td class="p-3">${totalAmount.toFixed(2)}</td>
+          <td class="p-3">${paidAmount.toFixed(2)}</td>
+          <td class="p-3">${remainingAmount.toFixed(2)}</td>
+          <td class="p-3">${new Date(sale.created_at).toLocaleString('ar-EG')}</td>
+          <td class="p-3">${sale.notes || '-'}</td>
+          <td class="p-3">
+            <button onclick="deleteSale(${sale.id})" class="bg-red-500 text-white px-2 py-1 rounded text-sm">حذف</button>
+          </td>
         `;
-        salesList.appendChild(div);
+        salesTableBody.appendChild(row);
+      });
+    }
+  } catch (error) {
+    console.error('Error loading sales:', error.stack);
+    showAlert('error', 'خطأ في تحميل المبيعات: ' + error.message);
+  }
+}
+
+async function getProductName(productId) {
+  if (!productId) return 'غير محدد';
+  
+  try {
+    const result = await pool.query('SELECT name FROM products WHERE id = $1', [productId]);
+    return result.rows[0]?.name || 'غير محدد';
+  } catch (error) {
+    console.error('Error getting product name:', error);
+    return 'غير محدد';
+  }
+}
+
+async function deleteSale(saleId) {
+  try {
+    const saleResult = await pool.query('SELECT * FROM product_sales WHERE id = $1', [saleId]);
+    
+    if (saleResult.rows.length === 0) {
+      throw new Error('عملية البيع غير موجودة');
+    }
+    
+    const sale = saleResult.rows[0];
+    const totalAmount = Number(sale.total_amount) || 0;
+    const productName = await getProductName(sale.product_id);
+    
+    const confirmationMessage = `
+      <div class="mb-4 text-right">
+        <p class="font-bold text-lg">تأكيد الحذف</p>
+        <p class="mt-2">المنتج: <span class="font-semibold">${productName}</span></p>
+        <p>المبلغ: <span class="font-semibold">${totalAmount.toFixed(2)}</span></p>
+        <p>التاريخ: <span class="font-semibold">${new Date(sale.created_at).toLocaleString('ar-EG')}</span></p>
+      </div>
+      <p class="text-red-600 font-bold">هل أنت متأكد من حذف هذه العملية؟</p>
+    `;
+    
+    const userConfirmed = await showCustomConfirmation(confirmationMessage);
+    if (!userConfirmed) return;
+    
+    await pool.query('DELETE FROM product_sales WHERE id = $1', [saleId]);
+    showAlert('success', 'تم حذف عملية البيع بنجاح');
+    await loadSales();
+    
+  } catch (error) {
+    console.error('Error deleting sale:', error);
+    showAlert('error', `خطأ في حذف عملية البيع: ${error.message}`);
+  }
+}
+
+// UI Helpers
+function showCustomConfirmation(message) {
+  return new Promise((resolve) => {
+    const dialog = document.createElement('div');
+    dialog.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    dialog.innerHTML = `
+      <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
+        ${message}
+        <div class="flex justify-end space-x-5 mt-4">
+          <button id="confirmCancel" class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 mx-3 rounded">
+            إلغاء
+          </button>
+          <button id="confirmDelete" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">
+            نعم، احذف
+          </button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(dialog);
+    
+    document.getElementById('confirmDelete').onclick = () => {
+      dialog.remove();
+      resolve(true);
+    };
+    
+    document.getElementById('confirmCancel').onclick = () => {
+      dialog.remove();
+      resolve(false);
+    };
+  });
+}
+
+function showAlert(type, message) {
+  const alert = document.createElement('div');
+  alert.className = `fixed top-20 right-4 z-50 p-4 rounded-lg shadow-lg border ${
+    type === 'success' 
+      ? 'bg-green-100 border-green-400 text-green-800' 
+      : 'bg-red-100 border-red-400 text-red-800'
+  }`;
+  alert.innerHTML = `
+    <div class="flex items-center">
+      <span>${message}</span>
+      <button onclick="this.parentElement.parentElement.remove()" class="mr-2 text-lg">
+        &times;
+      </button>
+    </div>
+  `;
+  
+  document.body.appendChild(alert);
+  setTimeout(() => alert.remove(), 5000);
+}
+
+// Make functions available globally
+window.deleteSale = deleteSale;
+window.getProductName = getProductName;
+window.showCustomConfirmation = showCustomConfirmation;
+window.showAlert = showAlert;
+
+// Initialize
+initDatabase();
+
+// Add this function to create the simplified sales form
+function createSalesForm() {
+  const salesTab = document.getElementById('sales');
+  if (!salesTab) return;
+
+  salesTab.innerHTML = `
+    <div class="bg-white p-6 rounded-lg shadow-md max-w-2xl mx-auto">
+      <h2 class="text-2xl font-bold text-center mb-6">تسجيل المبيعات</h2>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Product Selection -->
+        <div class="col-span-1">
+          <label class="block mb-2">المنتج</label>
+          <select id="salesProduct" class="w-full p-2 border rounded" required>
+            <option value="">اختر منتج</option>
+          </select>
+        </div>
+        
+        <!-- Quantity -->
+        <div class="col-span-1">
+          <label class="block mb-2">الكمية</label>
+          <input type="number" id="salesQuantity" min="1" value="1" 
+                 class="w-full p-2 border rounded" required>
+        </div>
+        
+        <!-- Sale Type -->
+        <div class="col-span-1">
+          <label class="block mb-2">نوع البيع</label>
+          <select id="salesType" class="w-full p-2 border rounded" required>
+            <option value="retail">بيع قطاعي</option>
+            <option value="wholesale">بيع جملة</option>
+          </select>
+        </div>
+        
+        <!-- Total Amount -->
+        <div class="col-span-1">
+          <label class="block mb-2">المبلغ الإجمالي</label>
+          <input type="number" id="salesTotalAmount" min="0" step="0.01" 
+                 class="w-full p-2 border rounded" required>
+        </div>
+        
+        <!-- Paid Amount -->
+        <div class="col-span-1">
+          <label class="block mb-2">المبلغ المدفوع</label>
+          <input type="number" id="salesPaidAmount" min="0" step="0.01" 
+                 class="w-full p-2 border rounded" required>
+        </div>
+        
+        <!-- Remaining Amount (auto-calculated) -->
+        <div class="col-span-1">
+          <label class="block mb-2">المبلغ المتبقي</label>
+          <input type="number" id="salesRemainingAmount" readonly 
+                 class="w-full p-2 border rounded bg-gray-100">
+        </div>
+        
+        <!-- Notes -->
+        <div class="col-span-2">
+          <label class="block mb-2">ملاحظات</label>
+          <textarea id="salesNotes" rows="2" class="w-full p-2 border rounded"></textarea>
+        </div>
+      </div>
+      
+      <!-- Submit Button -->
+      <div class="mt-6 text-center">
+        <button onclick="submitSale()" 
+                class="bg-green-600 text-white px-6 py-2 rounded-lg">
+          حفظ
+        </button>
+      </div>
+    </div>
+  `;
+
+  // Setup event listeners
+  document.getElementById('salesTotalAmount').addEventListener('input', calculateRemaining);
+  document.getElementById('salesPaidAmount').addEventListener('input', calculateRemaining);
+  
+  // Populate products dropdown
+  populateProductsDropdown();
+}
+
+// Populate products dropdown
+async function populateProductsDropdown() {
+  try {
+    const result = await pool.query('SELECT id, name FROM products ORDER BY name');
+    const select = document.getElementById('salesProduct');
+    
+    // Clear existing options
+    select.innerHTML = '<option value="">اختر منتج</option>';
+    
+    result.rows.forEach(product => {
+      const option = document.createElement('option');
+      option.value = product.id;
+      option.textContent = product.name;
+      select.appendChild(option);
+    });
+  } catch (error) {
+    console.error('Error loading products:', error);
+    alert('خطأ في تحميل قائمة المنتجات');
+  }
+}
+
+// Calculate remaining amount
+function calculateRemaining() {
+  const total = parseFloat(document.getElementById('salesTotalAmount').value) || 0;
+  const paid = parseFloat(document.getElementById('salesPaidAmount').value) || 0;
+  const remaining = total - paid;
+  document.getElementById('salesRemainingAmount').value = remaining.toFixed(2);
+}
+
+// Submit sale to database
+async function submitSale() {
+  // Get form values
+  const productId = document.getElementById('salesProduct').value;
+  const quantity = parseInt(document.getElementById('salesQuantity').value) || 1;
+  const saleType = document.getElementById('salesType').value;
+  const totalAmount = parseFloat(document.getElementById('salesTotalAmount').value);
+  const paidAmount = parseFloat(document.getElementById('salesPaidAmount').value) || 0;
+  const remainingAmount = totalAmount - paidAmount;
+  const notes = document.getElementById('salesNotes').value.trim();
+
+  // Validate inputs
+  if (!productId) {
+    alert('يجب اختيار المنتج');
+    return;
+  }
+  
+  if (isNaN(quantity) || quantity < 1) {
+    alert('يجب إدخال كمية صحيحة');
+    return;
+  }
+  
+  if (isNaN(totalAmount) || totalAmount <= 0) {
+    alert('يجب إدخال مبلغ إجمالي صحيح');
+    return;
+  }
+  
+  if (isNaN(paidAmount) || paidAmount < 0) {
+    alert('يجب إدخال مبلغ مدفوع صحيح');
+    return;
+  }
+  
+  if (paidAmount > totalAmount) {
+    alert('المبلغ المدفوع لا يمكن أن يكون أكبر من المبلغ الإجمالي');
+    return;
+  }
+
+  try {
+    // Insert into product_sales table
+    await pool.query(
+      `INSERT INTO product_sales (
+        product_id, quantity, sale_type, 
+        total_amount, paid_amount, remaining_amount, notes
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [productId, quantity, saleType, totalAmount, paidAmount, remainingAmount, notes]
+    );
+    
+    // Reset form
+    document.getElementById('salesProduct').value = '';
+    document.getElementById('salesQuantity').value = '1';
+    document.getElementById('salesType').value = 'retail';
+    document.getElementById('salesTotalAmount').value = '';
+    document.getElementById('salesPaidAmount').value = '';
+    document.getElementById('salesRemainingAmount').value = '';
+    document.getElementById('salesNotes').value = '';
+    
+    alert('تم تسجيل عملية البيع بنجاح');
+  } catch (error) {
+    console.error('Error saving sale:', error);
+    alert('حدث خطأ أثناء حفظ البيانات: ' + error.message);
+  }
+}
+
+async function loadSales() {
+  try {
+    const result = await pool.query(`
+      SELECT ps.*, p.name as product_name 
+      FROM product_sales ps
+      LEFT JOIN products p ON ps.product_id = p.id
+      ORDER BY ps.created_at DESC
+    `);
+    
+    const salesTableBody = document.getElementById('salesTableBody');
+    if (!salesTableBody) {
+      console.error('Sales table body element not found');
+      return;
+    }
+    
+    salesTableBody.innerHTML = '';
+    
+    if (!result.rows || result.rows.length === 0) {
+      salesTableBody.innerHTML = `
+        <tr>
+          <td colspan="9" class="p-4 text-center text-gray-500">لا توجد مبيعات مسجلة</td>
+        </tr>
+      `;
+    } else {
+      result.rows.forEach(sale => {
+        const row = document.createElement('tr');
+        row.className = 'border-b hover:bg-gray-50';
+        row.innerHTML = `
+          <td class="p-3">${sale.product_name || 'غير محدد'}</td>
+          <td class="p-3">${sale.quantity}</td>
+          <td class="p-3">${sale.sale_type === 'retail' ? 'قطاعي' : 'جملة'}</td>
+          <td class="p-3">${Number(sale.total_amount).toFixed(2)}</td>
+          <td class="p-3">${Number(sale.paid_amount).toFixed(2)}</td>
+          <td class="p-3">${Number(sale.remaining_amount).toFixed(2)}</td>
+          <td class="p-3">${new Date(sale.created_at).toLocaleString('ar-EG')}</td>
+          <td class="p-3">${sale.notes || '-'}</td>
+          <td class="p-3">
+            <button onclick="deleteSale(${sale.id})" class="bg-red-500 text-white px-2 py-1 rounded text-sm">حذف</button>
+          </td>
+        `;
+        salesTableBody.appendChild(row);
       });
     }
   } catch (error) {
@@ -631,16 +1008,84 @@ async function loadSales() {
   }
 }
 
-async function deleteSale(saleId) {
-  if (confirm('هل أنت متأكد من مسح هذه المبيعة؟')) {
-    try {
-      await pool.query('DELETE FROM sales WHERE id = $1', [saleId]);
-      loadSales();
-    } catch (error) {
-      console.error('Error deleting sale:', error.stack);
-      alert('خطأ في مسح المبيعة: ' + error.message);
-    }
+function createSalesForm() {
+  const salesFormContainer = document.getElementById('salesFormContainer');
+  if (!salesFormContainer) {
+    console.error('Sales form container not found');
+    return;
   }
+
+  salesFormContainer.innerHTML = `
+    <h3 class="text-xl font-bold mb-4 text-center">تسجيل عملية بيع جديدة</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="col-span-1">
+        <label class="block mb-2 font-medium">المنتج</label>
+        <select id="salesProduct" class="w-full p-3 border rounded-lg bg-blue-200 px-4" required>
+          <option value="">اختر منتج</option>
+        </select>
+      </div>
+      <div class="col-span-1">
+        <label class="block mb-2 font-medium">الكمية</label>
+        <input type="number" id="salesQuantity" min="1" value="1" 
+               class="w-full p-3 border rounded-lg bg-gray-50" required>
+      </div>
+      <div class="col-span-1">
+        <label class="block mb-2 font-medium">نوع البيع</label>
+        <select id="salesType" class="w-full p-3 border rounded-lg bg-blue-200 px-4" required>
+          <option value="retail">بيع قطاعي</option>
+          <option value="wholesale">بيع جملة</option>
+        </select>
+      </div>
+      <div class="col-span-1">
+        <label class="block mb-2 font-medium">المبلغ الإجمالي</label>
+        <input type="number" id="salesTotalAmount" min="0" step="0.01" 
+               class="w-full p-3 border rounded-lg bg-gray-50" required>
+      </div>
+      <div class="col-span-1">
+        <label class="block mb-2 font-medium">المبلغ المدفوع</label>
+        <input type="number" id="salesPaidAmount" min="0" step="0.01" 
+               class="w-full p-3 border rounded-lg bg-gray-50" required>
+      </div>
+      <div class="col-span-1">
+        <label class="block mb-2 font-medium">المبلغ المتبقي</label>
+        <input type="number" id="salesRemainingAmount" readonly 
+               class="w-full p-3 border rounded-lg bg-gray-100">
+      </div>
+      <div class="col-span-2">
+        <label class="block mb-2 font-medium">ملاحظات</label>
+        <textarea id="salesNotes" rows="2" class="w-full p-3 border rounded-lg bg-gray-50"></textarea>
+      </div>
+    </div>
+    <div class="mt-6 text-center">
+      <button onclick="submitSale()" 
+              class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium btn-hover">
+        حفظ العملية
+      </button>
+    </div>
+  `;
+
+  // Setup event listeners
+  document.getElementById('salesTotalAmount')?.addEventListener('input', calculateRemaining);
+  document.getElementById('salesPaidAmount')?.addEventListener('input', calculateRemaining);
+  
+  // Populate products dropdown
+  populateProductsDropdown();
+}
+
+// Modify the showTab function for sales
+function showTab(tabId) {
+  document.querySelectorAll('.tab').forEach(tab => tab.classList.add('hidden'));
+  document.getElementById(tabId).classList.remove('hidden');
+  if (tabId === 'clients') loadClients();
+  if (tabId === 'capital') loadCapital();
+  if (tabId === 'expenses') loadExpenses();
+  if (tabId === 'purchases') loadPurchases();
+  if (tabId === 'manufacturing') loadProducts();
+  if (tabId === 'sales') {
+    createSalesForm();// This will now show only the form
+    loadSales(); 
+  }
+  if (tabId === 'credit') loadCredit();
 }
 
 async function loadCredit() {
@@ -654,30 +1099,51 @@ async function loadCredit() {
     console.log('Credit data:', result.rows);
     const creditList = document.getElementById('creditList');
     creditList.innerHTML = '';
+    
+    // Add a section for the total remaining amount
+    const totalDiv = document.createElement('div');
+    totalDiv.className = 'bg-blue-100 p-4 rounded shadow mb-4';
+    
     const clients = {};
+    let totalRemaining = 0; // Variable to accumulate the total remaining amount
+    
     result.rows.forEach(row => {
       if (!clients[row.id]) {
         clients[row.id] = { name: row.name, orders: [] };
       }
       if (row.order_id) {
+        const remaining = (Number(row.amount) || 0) - (Number(row.paid) || 0);
         clients[row.id].orders.push({
           id: row.order_id,
           quantity: row.quantity,
           details: row.details,
           amount: Number(row.amount) || 0,
           paid: Number(row.paid) || 0,
-          remaining: (Number(row.amount) || 0) - (Number(row.paid) || 0),
+          remaining: remaining,
           created_at: row.created_at,
         });
+        totalRemaining += remaining; // Add to the total
       }
     });
+    
+    // Display the total remaining amount
+    totalDiv.innerHTML = `
+      <h3 class="text-xl font-bold text-blue-900">إجمالي المتبقي لجميع العملاء</h3>
+      <p class="text-2xl font-bold">${totalRemaining.toFixed(2)}</p>
+    `;
+    creditList.appendChild(totalDiv);
+    
+    // Display each client's information
     for (const clientId in clients) {
       const client = clients[clientId];
+      const clientRemaining = client.orders.reduce((sum, order) => sum + order.remaining, 0);
+      
       const div = document.createElement('div');
-      div.className = 'bg-white p-4 rounded shadow';
+      div.className = 'bg-white p-4 rounded shadow mb-4';
       div.innerHTML = `
         <h3 class="text-lg font-bold">${client.name}</h3>
-        <h4>الطلبيات:</h4>
+        <p class="text-md mb-2">إجمالي المتبقي: ${clientRemaining.toFixed(2)}</p>
+        <h4 class="font-semibold">الطلبيات:</h4>
         <ul class="grid grid-cols-1 gap-2">
           ${client.orders.length ? client.orders.map(order => `
             <li class="bg-gray-100 p-2 rounded">

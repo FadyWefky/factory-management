@@ -114,9 +114,36 @@
     </div>
 
     <div id="sales" class="tab hidden tab-content">
-      <h2 class="text-2xl font-bold mb-4 animate__animated animate__fadeIn">المبيعات</h2>
-      <div id="salesList" class="grid grid-cols-1 gap-4"></div>
+  <h2 class="text-2xl font-bold mb-4">المبيعات</h2>
+  
+  <!-- Sales Form Container -->
+  <div id="salesFormContainer" class="bg-white p-6 rounded-lg shadow-md mb-8">
+    <!-- Form will be inserted here by JavaScript -->
+  </div>
+  
+  <!-- Sales List Container -->
+  <div id="salesListContainer" class="bg-white p-4 rounded-lg shadow">
+    <h3 class="text-xl font-bold mb-4">سجل المبيعات</h3>
+    <div id="salesTableContainer" class="overflow-x-auto">
+      <table class="w-full">
+        <thead>
+          <tr class="bg-gray-200">
+            <th class="p-3 text-right">المنتج</th>
+            <th class="p-3 text-right">الكمية</th>
+            <th class="p-3 text-right">نوع البيع</th>
+            <th class="p-3 text-right">المبلغ الإجمالي</th>
+            <th class="p-3 text-right">المدفوع</th>
+            <th class="p-3 text-right">المتبقي</th>
+            <th class="p-3 text-right">التاريخ</th>
+            <th class="p-3 text-right">ملاحظات</th>
+            <th class="p-3 text-right">إجراءات</th>
+          </tr>
+        </thead>
+        <tbody id="salesTableBody"></tbody>
+      </table>
     </div>
+  </div>
+</div>
 
     <div id="credit" class="tab hidden tab-content">
       <h2 class="text-2xl font-bold mb-4 animate__animated animate__fadeIn">البيع بالأجل</h2>
