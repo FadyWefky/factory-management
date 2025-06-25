@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+
+  body {
+      font-family: 'Cairo', sans-serif;
+      
+    }
+    /* Custom animations */
+    .tab-content {
+      animation: fadeIn 1s ease-out;
+    }
+    .modal-content {
+      animation: zoomIn 0.7s ease-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes zoomIn {
+      from { opacity: 0; transform: scale(0.9); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    /* Button hover effects */
+    .btn-hover {
+      transition: all 0.3s ease;
+    }
+    .btn-hover:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    /* List item animation */
+    .list-item {
+      transition: all 0.3s ease;
+    }
+    .list-item:hover {
+      transform: translateX(-5px);
+    }

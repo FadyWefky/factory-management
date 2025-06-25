@@ -207,4 +207,3 @@ cd factory-management
 - **Cross-Platform**: The setup works on both Windows and Linux with minimal differences.
 - **Security**: Replace `your_password` with a secure password and consider using environment variables for sensitive data in production.
 
-You now have a fully functional factory management app running locally with all the requested features! If you encounter issues or need further customization, let me know.

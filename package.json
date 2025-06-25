@@ -5,7 +5,8 @@
   "main": "main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "electron ."
+    "start": "electron .",
+  "build:css": "npx tailwindcss -i ./styles.css -o ./dist.css --minify"
   },
   "keywords": [],
   "author": "",
@@ -16,5 +17,11 @@
     "electron": "^22.0.0",
     "exceljs": "^4.3.0",
     "pg": "^8.7.3"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.16",
+    "electron": "^28.0.0",
+    "postcss": "^8.4.31",
+    "tailwindcss": "^3.4.0"
   }
 }
