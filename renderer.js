@@ -1223,5 +1223,50 @@ function closeModal(modalId) {
 initDatabase();
 showTab('clients');
 
+// database backup
+const { exec } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 
+const backupDir = path.join(__dirname, 'backups');
 
+if (!fs.existsSync(backupDir)) {
+  fs.mkdirSync(backupDir, { recursive: true });
+}
+
+async function createBackup() {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const backupFile = path.join(backupDir, `backup_factory_management_${timestamp}.sql`);
+  const pgDumpCommand = `pg_dump -U postgres -h localhost -p 5432 factory_management > "${backupFile}"`;
+  const button = document.getElementById('backupButton');
+  button.disabled = true;
+  button.innerText = 'جاري النسخ...';
+
+  try {
+    await new Promise((resolve, reject) => {
+      exec(pgDumpCommand, { env: { ...process.env, PGPASSWORD: 'test' } }, (error, stdout, stderr) => {
+        if (error) {
+          console.error('Backup failed:', stderr);
+          reject(new Error(`فشل النسخ الاحتياطي: ${stderr}`));
+          return;
+        }
+        
+        console.log('Backup created successfully:', backupFile);
+        resolve();
+      });
+    });
+    showAlert('success', 'تم إنشاء النسخة الاحتياطية بنجاح في ' + backupFile);
+    const files = fs.readdirSync(backupDir).sort().reverse();
+    const maxBackups = 7;
+    if (files.length > maxBackups) {
+      for (const file of files.slice(maxBackups)) {
+        fs.unlinkSync(path.join(backupDir, file));
+      }
+    }
+  } catch (error) {
+    console.error('Error during backup:', error.message);
+    showAlert('error', error.message);
+  }
+}
+
+window.createBackup = createBackup;
